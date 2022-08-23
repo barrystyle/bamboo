@@ -34,3 +34,4 @@ bool checkSignature(string content, TransactionSignature signature, PublicKey si
 bool checkSignature(const char* bytes, size_t len, TransactionSignature signature, PublicKey signingKey);
 SHA256Hash mineHash(SHA256Hash target, unsigned char challengeSize, bool usePufferfish=false);
 bool verifyHash(SHA256Hash& target, SHA256Hash& nonce, unsigned char challengeSize, bool usePufferfish=false);
+void mineThread(int threadId, SHA256Hash target, unsigned char challengeSize, bool usePufferfish, bool blkFound, SHA256Hash blkSolution);

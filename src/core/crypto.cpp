@@ -248,3 +248,31 @@ SHA256Hash mineHash(SHA256Hash target, unsigned char challengeSize, bool usePuff
 
     return solution;
 }
+
+void mineThread(int threadId, SHA256Hash target, unsigned char challengeSize, bool usePufferfish, bool blkFound, SHA256Hash blkSolution) {
+
+    vector<uint8_t> concat;
+    SHA256Hash solution;
+    std::random_device t_rand;
+    uint32_t i = 0;
+
+    concat.resize(2 * 32);
+    for (size_t i = 0; i < 32; i++) concat[i] = target[i];
+    // fill with random data for privacy (one cannot guess number of tries later)
+    for (size_t i = 32; i < 64; ++i) concat[i] = t_rand() % 256;
+
+    while(true) {
+        ++i;
+        *reinterpret_cast<uint64_t*>(concat.data() + 32) += 1;
+        memcpy(solution.data(), concat.data() + 32, 32);
+        SHA256Hash fullHash = concatHashes(target, solution, usePufferfish);
+
+        bool found = checkLeadingZeroBits(fullHash, challengeSize);
+
+        if (found) {
+            blkFound = found;
+            blkSolution = solution;
+            return;
+        }
+    };
+}

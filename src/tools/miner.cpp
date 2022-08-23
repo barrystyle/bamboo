@@ -21,6 +21,8 @@ void get_work(PublicWalletAddress wallet, HostManager& hosts, string& customHost
     int failureCount = 0;
     int last_block_id = 0;
     int last_difficulty = 0;
+    bool usePufferfish = false;
+    vector<thread> minerThreads;
 
     time_t blockstart = std::time(0);
 
@@ -95,9 +97,28 @@ void get_work(PublicWalletAddress wallet, HostManager& hosts, string& customHost
             last_difficulty = challengeSize;
             last_block_id = currCount;
             blockstart = std::time(0);
+            usePufferfish = newBlock.getId() > PUFFERFISH_START_BLOCK;
+            SHA256Hash newBlockHash = newBlock.getHash();
 
-            SHA256Hash solution = mineHash(newBlock.getHash(), challengeSize, newBlock.getId() > PUFFERFISH_START_BLOCK);
-            newBlock.setNonce(solution);
+            // for results
+            bool blkFound = false;
+            SHA256Hash blkSolution;
+            for (int threadId=0; threadId<4; threadId++) {
+                Logger::logStatus("mining thread" + std::to_string(threadId) + " launched..");
+                minerThreads.push_back(std::thread(&mineThread, threadId, newBlockHash, challengeSize, usePufferfish, std::ref(blkFound), std::ref(blkSolution)));
+            }
+
+            while (!blkFound) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+            }
+
+            for (int threadId=0; threadId<4; threadId++) {
+                if (minerThreads.at(threadId).joinable()) {
+                    minerThreads.at(threadId).join();
+                }
+            }
+
+            newBlock.setNonce(blkSolution);
             Logger::logStatus("Submitting block...");
             auto result = submitBlock(host, newBlock);
             if (result.contains("status") && string(result["status"]) == "SUCCESS")  {
@@ -141,6 +162,6 @@ int main(int argc, char **argv) {
         Logger::logStatus("Running miner. Coins stored in : " + customWallet);
     }
         
-    Logger::logStatus("Starting miner on single thread");
+    Logger::logStatus("Starting miner thread(s)");
     get_work(wallet, hosts, customIp);
 }
